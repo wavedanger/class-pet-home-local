@@ -1,0 +1,13 @@
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA 路由兜底（当前项目无 vue-router，但保留不影响）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
