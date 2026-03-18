@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useAppStore } from '@/stores/app'
 import type { ScoreCategory, ScoreRule } from '@/lib/models'
 import ModalBase from '@/components/modals/ModalBase.vue'
@@ -149,6 +149,20 @@ const growthDraft = ref({
   badgeEveryExp: 200,
 })
 const msg = ref<string | null>(null)
+const toastOpen = ref(false)
+const toastText = ref('')
+let toastTimer: number | null = null
+
+watch(msg, (v) => {
+  if (!v) return
+  toastText.value = v
+  toastOpen.value = true
+  if (toastTimer) window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => {
+    toastOpen.value = false
+    msg.value = null
+  }, 1800)
+})
 
 watchEffect(() => {
   // 进入弹窗时同步一次（避免刷新）
@@ -174,6 +188,61 @@ function resetAll() {
   app.resetData()
   msg.value = '已重置'
 }
+
+// --- 导入/导出
+const dataIoOpen = ref(false)
+const importJson = ref('')
+const importErr = ref<string | null>(null)
+
+function openDataIo() {
+  importJson.value = ''
+  importErr.value = null
+  dataIoOpen.value = true
+}
+
+async function copyExportJson() {
+  const text = app.exportData()
+  try {
+    await navigator.clipboard.writeText(text)
+    msg.value = '已复制到剪贴板'
+  } catch {
+    // fallback：仍然把内容放进输入框，方便手动复制
+    importJson.value = text
+    msg.value = '复制失败：已填充到文本框，请手动复制'
+    dataIoOpen.value = true
+  }
+}
+
+function downloadExportJson() {
+  const text = app.exportData()
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const ts = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const name = `class-pet-home_${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}.json`
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+  msg.value = '已导出文件'
+}
+
+function doImport() {
+  importErr.value = null
+  try {
+    const text = importJson.value.trim()
+    if (!text) {
+      importErr.value = '请输入要导入的 JSON'
+      return
+    }
+    app.importData(text)
+    msg.value = '已导入并保存'
+    dataIoOpen.value = false
+  } catch (e: any) {
+    importErr.value = e?.message ? String(e.message) : '导入失败：JSON 格式不正确或版本不支持'
+  }
+}
 </script>
 
 <template>
@@ -181,14 +250,21 @@ function resetAll() {
     <template #title>设置与帮助</template>
 
     <div class="content-wrap">
+      <Transition name="toast">
+        <div v-if="toastOpen" class="toast" role="status" aria-live="polite">
+          <div class="toast-inner">
+            <div class="toast-title">消息提示</div>
+            <div class="toast-body">{{ toastText }}</div>
+          </div>
+        </div>
+      </Transition>
+
       <div class="tabs">
         <button class="tab" :class="{ active: tab === 'rules' }" @click="tab = 'rules'">📋 加减分规则</button>
         <button class="tab" :class="{ active: tab === 'growth' }" @click="tab = 'growth'">📈 成长设置</button>
         <button class="tab" :class="{ active: tab === 'data' }" @click="tab = 'data'">🗃 数据管理</button>
         <button class="tab" :class="{ active: tab === 'about' }" @click="tab = 'about'">👥 软件与帮助</button>
       </div>
-
-      <div v-if="msg" class="mt-3 text-sm text-slate-600">{{ msg }}</div>
 
       <!-- 加减分规则 -->
       <div v-if="tab === 'rules'" class="panel">
@@ -378,6 +454,18 @@ function resetAll() {
       <div class="text-xl font-semibold">数据管理</div>
       <div class="text-sm text-slate-500 mt-1">管理应用数据及状态</div>
 
+      <div class="mt-4 rounded-3xl border border-slate-200 bg-white px-6 py-5 flex items-center justify-between gap-4">
+        <div>
+          <div class="font-semibold flex items-center gap-2">💾 导入/导出</div>
+          <div class="text-sm text-slate-600 mt-1">将当前数据导出为 JSON，或导入 JSON 初始化/迁移数据</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn" @click="copyExportJson">复制导出</button>
+          <button class="btn" @click="downloadExportJson">下载导出</button>
+          <button class="btn-primary" @click="openDataIo">💾 导入数据</button>
+        </div>
+      </div>
+
       <div class="danger mt-4">
         <div>
           <div class="font-semibold text-rose-700 flex items-center gap-2">🗑 一键重置</div>
@@ -399,12 +487,63 @@ function resetAll() {
       </div>
       <div v-else></div>
     </div>
+
+    <!-- 导入数据弹窗 -->
+    <div v-if="dataIoOpen" class="sheet-mask" @click.self="dataIoOpen = false">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="text-lg font-semibold">导入 / 导出 JSON</div>
+          <button class="x" @click="dataIoOpen = false">×</button>
+        </div>
+
+        <div class="sheet-body">
+          <div class="text-sm text-slate-600">
+            导出用于备份/迁移；导入会直接覆盖当前数据并写入本机 <span class="font-semibold">localStorage</span>。
+          </div>
+
+          <div class="mt-4 flex items-center gap-2">
+            <button class="btn" @click="copyExportJson">复制当前数据 JSON</button>
+            <button class="btn" @click="downloadExportJson">下载 JSON 文件</button>
+          </div>
+
+          <div class="mt-4 label">粘贴要导入的 JSON</div>
+          <textarea v-model="importJson" class="field textarea" rows="10" placeholder="粘贴导出的 JSON 内容"></textarea>
+          <div v-if="importErr" class="mt-2 text-sm text-rose-700">{{ importErr }}</div>
+        </div>
+
+        <div class="sheet-foot">
+          <button class="btn-lite" @click="dataIoOpen = false">取消</button>
+          <button class="btn-primary" @click="doImport">确认导入</button>
+        </div>
+      </div>
+    </div>
   </ModalBase>
 </template>
 
 <style scoped>
 .content-wrap {
   @apply min-h-[60vh] lg:min-h-[640px];
+}
+.toast {
+  @apply fixed top-6 right-6 z-[60] max-w-[360px] w-[calc(100vw-48px)];
+}
+.toast-inner {
+  @apply rounded-3xl border border-slate-200 bg-white/95 backdrop-blur shadow-soft px-5 py-4;
+}
+.toast-title {
+  @apply text-xs text-slate-500 font-semibold;
+}
+.toast-body {
+  @apply mt-1.5 text-sm text-slate-800;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 .tabs {
   @apply mt-2 flex items-center gap-6 border-b border-slate-100 pb-2;
@@ -547,6 +686,9 @@ function resetAll() {
 }
 .btn-primary {
   @apply rounded-2xl px-5 py-2 text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.textarea {
+  @apply font-mono text-xs leading-5;
 }
 .growth {
   @apply mt-4;
