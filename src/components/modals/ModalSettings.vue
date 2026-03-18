@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useAppStore } from '@/stores/app'
-import type { ScoreCategory } from '@/lib/models'
+import type { ScoreCategory, ScoreRule } from '@/lib/models'
 import ModalBase from '@/components/modals/ModalBase.vue'
 
 const app = useAppStore()
@@ -18,13 +18,129 @@ const categories = computed(() => {
     else cur.minus += 1
     map.set(r.category, cur)
   }
-  return (['学习', '行为', '健康', '其他'] as ScoreCategory[])
-    .filter((c) => map.has(c))
-    .map((c) => ({ category: c, ...map.get(c)! }))
+  return (['学习', '行为', '健康', '其他'] as ScoreCategory[]).map((c) => ({
+    category: c,
+    ...(map.get(c) ?? { plus: 0, minus: 0, total: 0 }),
+  }))
 })
 const activeCategory = ref<ScoreCategory>('学习')
 
-const rulesOfActive = computed(() => app.data.rules.filter((r) => r.category === activeCategory.value))
+const rulesOfActive = computed(() =>
+  app.data.rules
+    .filter((r) => r.category === activeCategory.value)
+    .slice()
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+)
+const ruleStats = computed(() => {
+  let plus = 0
+  let minus = 0
+  for (const r of app.data.rules) {
+    if (r.delta >= 0) plus += 1
+    else minus += 1
+  }
+  return { plus, minus }
+})
+
+// 新增/编辑指标弹窗
+const ruleEditorOpen = ref(false)
+const isEditing = ref(false)
+const ruleDraft = ref({
+  id: null as null | string,
+  icon: '⭐',
+  title: '',
+  category: '学习' as ScoreCategory,
+  scope: 'all' as 'all' | 'class',
+  kind: 'plus' as 'plus' | 'minus',
+  deltaAbs: 1,
+})
+
+const iconPool = [
+  '📘',
+  '📗',
+  '🧮',
+  '✍️',
+  '⭐',
+  '🏆',
+  '👍',
+  '🧠',
+  '💡',
+  '🧩',
+  '⏱️',
+  '✅',
+  '🫶',
+  '🎯',
+  '🧹',
+  '🌱',
+  '💪',
+  '🥗',
+  '🧼',
+  '🩺',
+  '⚠️',
+  '🧯',
+  '🚫',
+  '🗣️',
+  '🙂',
+  '❤️',
+  '🍎',
+  '🏅',
+]
+
+function openCreateRule() {
+  isEditing.value = false
+  ruleDraft.value = {
+    id: null,
+    icon: '⭐',
+    title: '',
+    category: activeCategory.value,
+    scope: 'all',
+    kind: 'plus',
+    deltaAbs: 1,
+  }
+  ruleEditorOpen.value = true
+}
+
+function openEditRule(r: ScoreRule) {
+  isEditing.value = true
+  ruleDraft.value = {
+    id: r.id,
+    icon: r.icon ?? '⭐',
+    title: r.title ?? '',
+    category: r.category,
+    scope: (r.scope === 'class' ? 'class' : 'all') as 'all' | 'class',
+    kind: r.delta >= 0 ? 'plus' : 'minus',
+    deltaAbs: Math.max(1, Math.floor(Math.abs(r.delta || 1))),
+  }
+  ruleEditorOpen.value = true
+}
+
+const canSubmitRule = computed(() => {
+  const title = ruleDraft.value.title.trim()
+  const n = Number(ruleDraft.value.deltaAbs)
+  return !!title && Number.isFinite(n) && n >= 1
+})
+
+function submitRule() {
+  if (!canSubmitRule.value) return
+  const abs = Math.max(1, Math.floor(Number(ruleDraft.value.deltaAbs)))
+  const delta = ruleDraft.value.kind === 'plus' ? abs : -abs
+  app.upsertScoreRule({
+    id: ruleDraft.value.id ?? undefined,
+    title: ruleDraft.value.title.trim(),
+    delta,
+    category: ruleDraft.value.category,
+    icon: ruleDraft.value.icon,
+    scope: ruleDraft.value.scope,
+    enabled: true,
+  })
+  ruleEditorOpen.value = false
+  msg.value = isEditing.value ? '已更新指标' : '已新增指标'
+}
+
+function removeRule(r: ScoreRule) {
+  if (!confirm(`确定删除「${r.title}」吗？`)) return
+  app.removeScoreRule(r.id)
+  msg.value = '已删除指标'
+}
 
 // --- 成长页
 const growthDraft = ref({
@@ -77,7 +193,7 @@ function resetAll() {
       <!-- 加减分规则 -->
       <div v-if="tab === 'rules'" class="panel">
       <div class="left">
-        <button class="btn-blue">＋ 新增指标</button>
+        <button class="btn-blue" @click="openCreateRule">＋ 新增指标</button>
         <div class="mt-4 text-xs text-slate-500">分类目录</div>
 
         <div class="mt-2 space-y-2">
@@ -98,6 +214,18 @@ function resetAll() {
             </div>
           </button>
         </div>
+
+        <div class="mt-6 border-t border-slate-100 pt-4 text-sm">
+          <div class="text-xs text-slate-500 mb-2">规则统计</div>
+          <div class="flex items-center justify-between">
+            <div class="text-emerald-700">加分</div>
+            <div class="font-semibold text-emerald-700">{{ ruleStats.plus }} 条</div>
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <div class="text-rose-700">减分</div>
+            <div class="font-semibold text-rose-700">{{ ruleStats.minus }} 条</div>
+          </div>
+        </div>
       </div>
 
       <div class="right">
@@ -111,24 +239,98 @@ function resetAll() {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
           <div v-for="r in rulesOfActive" :key="r.id" class="rule-card">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <div class="font-semibold truncate">{{ r.title }}</div>
-                <div class="mt-2 text-sm" :class="r.delta >= 0 ? 'text-emerald-700' : 'text-rose-700'">
-                  {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
-                </div>
+            <div class="rule-content">
+              <div class="rule-main">
+                <div class="icon-box" aria-hidden="true">{{ r.icon ?? '⭐' }}</div>
+                <div class="rule-title" :title="r.title">{{ r.title }}</div>
               </div>
-              <div class="flex items-center gap-2 text-slate-300">
-                <button class="mini" title="编辑（占位）">✎</button>
-                <button class="mini" title="删除（占位）">🗑</button>
+              <div class="rule-delta">
+                <button class="tag-all"  @click="openEditRule(r)">{{ r.scope === 'class' ? '本班' : '全部班级' }}</button>
+                <div :class="r.delta >= 0 ? 'plus' : 'minus'">{{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}</div>
               </div>
-            </div>
-            <div class="mt-3">
-              <button class="tag-all">全部班级</button>
+              <div class="rule-actions">
+                <button class="mini" title="编辑" @click="openEditRule(r)">✎</button>
+                <button class="mini" title="删除" @click="removeRule(r)">🗑</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      </div>
+
+      <!-- 新增/编辑指标 -->
+      <div v-if="ruleEditorOpen" class="sheet-mask" @click.self="ruleEditorOpen = false">
+        <div class="sheet">
+          <div class="sheet-head">
+            <div class="text-lg font-semibold">{{ isEditing ? '编辑指标' : '新增指标' }}</div>
+            <button class="x" @click="ruleEditorOpen = false">×</button>
+          </div>
+
+          <div class="sheet-body">
+            <div class="label">图标</div>
+            <div class="icon-grid">
+              <button
+                v-for="ic in iconPool"
+                :key="ic"
+                class="ic"
+                :class="{ active: ruleDraft.icon === ic }"
+                @click="ruleDraft.icon = ic"
+              >
+                {{ ic }}
+              </button>
+            </div>
+
+            <div class="mt-4 label">指标名称</div>
+            <input v-model="ruleDraft.title" class="field" placeholder="如：课堂发言" />
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="label">所属分类</div>
+                <select v-model="ruleDraft.category" class="field">
+                  <option value="学习">学习</option>
+                  <option value="行为">行为</option>
+                  <option value="健康">健康</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+
+              <div>
+                <div class="label">生效范围</div>
+                <div class="seg">
+                  <button class="seg-btn" :class="{ active: ruleDraft.scope === 'all' }" @click="ruleDraft.scope = 'all'">全部</button>
+                  <button class="seg-btn" :class="{ active: ruleDraft.scope === 'class' }" @click="ruleDraft.scope = 'class'">本班</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="label">评价导向</div>
+                <div class="seg">
+                  <button class="seg-btn" :class="{ active: ruleDraft.kind === 'plus' }" @click="ruleDraft.kind = 'plus'">奖励</button>
+                  <button class="seg-btn" :class="{ active: ruleDraft.kind === 'minus' }" @click="ruleDraft.kind = 'minus'">扣分</button>
+                </div>
+              </div>
+
+              <div>
+                <div class="label">分值设定</div>
+                <div class="delta-wrap">
+                  <span class="delta-sign" :class="ruleDraft.kind === 'plus' ? 'plus' : 'minus'">
+                    {{ ruleDraft.kind === 'plus' ? '+' : '-' }}
+                  </span>
+                  <input v-model.number="ruleDraft.deltaAbs" type="number" min="1" step="1" class="field delta" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-foot">
+            <button class="btn-lite" @click="ruleEditorOpen = false">取消</button>
+            <button class="btn-primary" :disabled="!canSubmitRule" @click="submitRule">
+              {{ isEditing ? '确认保存' : '确认添加' }}
+            </button>
+          </div>
+        </div>
       </div>
 
     <!-- 成长设置 -->
@@ -186,7 +388,7 @@ function resetAll() {
       </div>
 
     <!-- 软件与帮助 -->
-      <div v-else class="about">
+      <div v-else-if="tab === 'about'" class="about">
       <div class="text-xl font-semibold">关于「班级宠物园」</div>
       <div class="text-sm text-slate-600 mt-2">
         软件无需注册登录，不收集任何个人信息，免费供大家使用。可以任意拷贝分发。
@@ -195,6 +397,7 @@ function resetAll() {
         意见反馈请联系微信：<span class="font-semibold">H1203322195</span>（暗号：班级宠物园）
       </div>
       </div>
+      <div v-else></div>
     </div>
   </ModalBase>
 </template>
@@ -248,11 +451,102 @@ function resetAll() {
 .rule-card {
   @apply rounded-2xl border border-slate-200 bg-white p-4;
 }
+.rule-content {
+  @apply flex flex-col gap-2;
+}
+.rule-main {
+  @apply flex items-center gap-3 min-w-0 flex-1;
+}
+.rule-title {
+  @apply text-slate-900 font-semibold leading-5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.rule-delta {
+  @apply mt-2 text-sm font-semibold flex items-center gap-2 justify-between;
+}
+.plus {
+  @apply text-emerald-700;
+}
+.minus {
+  @apply text-rose-700;
+}
+.rule-actions {
+  @apply flex justify-end gap-2 shrink-0;
+}
+.icon-box {
+  @apply h-9 w-9 rounded-2xl bg-emerald-50 border border-emerald-100 grid place-items-center text-base shrink-0;
+}
 .mini {
   @apply h-9 w-9 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center text-slate-500;
 }
 .tag-all {
   @apply text-xs rounded-full px-3 py-1 bg-slate-50 border border-slate-200 text-slate-500;
+}
+.sheet-mask {
+  @apply fixed inset-0 z-50 bg-black/30 backdrop-blur-sm grid place-items-center p-4;
+}
+.sheet {
+  @apply w-full max-w-2xl rounded-3xl bg-white border border-slate-100 shadow-soft overflow-hidden;
+}
+.sheet-head {
+  @apply px-6 py-4 flex items-center justify-between border-b border-slate-100;
+}
+.x {
+  @apply h-10 w-10 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 grid place-items-center text-slate-600;
+}
+.sheet-body {
+  @apply px-6 py-5 max-h-[65vh] overflow-auto;
+}
+.label {
+  @apply text-xs text-slate-500;
+}
+.field {
+  @apply mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-200;
+}
+.icon-grid {
+  @apply mt-2 grid grid-cols-6 sm:grid-cols-10 gap-2 max-h-40 overflow-auto pr-1;
+}
+.ic {
+  @apply h-10 w-10 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 grid place-items-center text-base;
+}
+.ic.active {
+  @apply border-brand-400 ring-2 ring-brand-200 bg-brand-50;
+}
+.seg {
+  @apply mt-2 flex items-center rounded-2xl border border-slate-200 bg-white overflow-hidden;
+}
+.seg-btn {
+  @apply flex-1 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition;
+}
+.seg-btn.active {
+  @apply bg-brand-500 text-white hover:bg-brand-600;
+}
+.delta-wrap {
+  @apply mt-2 flex items-center gap-2;
+}
+.delta-sign {
+  @apply h-10 w-10 rounded-2xl grid place-items-center font-semibold border;
+}
+.delta-sign.plus {
+  @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+}
+.delta-sign.minus {
+  @apply bg-rose-50 text-rose-700 border-rose-200;
+}
+.field.delta {
+  @apply mt-0;
+}
+.sheet-foot {
+  @apply px-6 py-4 border-t border-slate-100 flex justify-end gap-2;
+}
+.btn-lite {
+  @apply rounded-2xl px-5 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 transition;
+}
+.btn-primary {
+  @apply rounded-2xl px-5 py-2 text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft disabled:opacity-50 disabled:cursor-not-allowed;
 }
 .growth {
   @apply mt-4;

@@ -7,12 +7,17 @@ export type ScoreKind = 'plus' | 'minus'
 
 export type ScoreCategory = '学习' | '行为' | '健康' | '其他'
 
+export type ScoreRuleScope = 'all' | 'class'
+
 export type ScoreRule = {
   id: Id
   title: string
   delta: number // 正为加分，负为扣分
   category: ScoreCategory
   enabled: boolean
+  // 可选字段：兼容旧数据（MVP 扩展）
+  icon?: string // emoji/icon 占位
+  scope?: ScoreRuleScope // all=全部班级，class=仅本班
 }
 
 export type PetState = {

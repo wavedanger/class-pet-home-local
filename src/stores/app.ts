@@ -7,12 +7,12 @@ import { firstPet } from '@/lib/pets'
 const LS_KEY = 'class-pet-home:data'
 
 const defaultRules: ScoreRule[] = [
-  { id: 'r1', title: '作业完成优秀', delta: 1, category: '学习', enabled: true },
-  { id: 'r2', title: '平时测验满分', delta: 3, category: '学习', enabled: true },
-  { id: 'r3', title: '默写全对', delta: 1, category: '学习', enabled: true },
-  { id: 'r4', title: '主动帮助同学', delta: 2, category: '行为', enabled: true },
-  { id: 'r5', title: '课前准备充分', delta: 1, category: '行为', enabled: true },
-  { id: 'r6', title: '忘带学习用品', delta: -1, category: '行为', enabled: true },
+  { id: 'r1', title: '作业完成优秀', delta: 1, category: '学习', enabled: true, icon: '📗', scope: 'all' },
+  { id: 'r2', title: '平时测验满分', delta: 3, category: '学习', enabled: true, icon: '🧮', scope: 'all' },
+  { id: 'r3', title: '默写全对', delta: 1, category: '学习', enabled: true, icon: '✍️', scope: 'all' },
+  { id: 'r4', title: '主动帮助同学', delta: 2, category: '行为', enabled: true, icon: '👍', scope: 'all' },
+  { id: 'r5', title: '课前准备充分', delta: 1, category: '行为', enabled: true, icon: '⭐', scope: 'all' },
+  { id: 'r6', title: '忘带学习用品', delta: -1, category: '行为', enabled: true, icon: '⚠️', scope: 'all' },
 ]
 
 function seedClassroom(): Classroom {
@@ -85,6 +85,14 @@ function normalizeData(data: AppData): AppData {
   if (!(data as any).shopItems) (data as any).shopItems = seedShopItems()
   if (!(data as any).shopRecords) (data as any).shopRecords = []
   if (!(data as any).growth) (data as any).growth = defaultGrowth()
+  // 规则容错：补 icon/scope 字段
+  if (!Array.isArray((data as any).rules)) (data as any).rules = defaultRules
+  for (const r of (data as any).rules as ScoreRule[]) {
+    if (typeof (r as any).enabled !== 'boolean') (r as any).enabled = true
+    if (typeof (r as any).icon !== 'string' || !(r as any).icon) (r as any).icon = '⭐'
+    const scope = (r as any).scope
+    if (scope !== 'all' && scope !== 'class') (r as any).scope = 'all'
+  }
   // growth 容错
   const g = (data as any).growth as GrowthConfig
   if (!Array.isArray(g.thresholds) || typeof g.maxLevel !== 'number') (data as any).growth = defaultGrowth()
@@ -510,6 +518,38 @@ export const useAppStore = defineStore('app', {
       const idx = this.data.shopItems.findIndex((x) => x.id === itemId)
       if (idx < 0) return
       this.data.shopItems.splice(idx, 1)
+      this.persist()
+    },
+    upsertScoreRule(patch: Partial<ScoreRule> & { id?: string }) {
+      const id = patch.id ?? newId('rule')
+      const existing = this.data.rules.find((x) => x.id === id)
+      const normalized: Partial<ScoreRule> = {
+        ...patch,
+        id,
+        enabled: patch.enabled ?? true,
+        icon: (patch as any).icon ?? existing?.icon ?? '⭐',
+        scope: (patch as any).scope ?? existing?.scope ?? 'all',
+      }
+      if (existing) {
+        Object.assign(existing, normalized)
+      } else {
+        this.data.rules.unshift({
+          id,
+          title: patch.title ?? '新指标',
+          delta: typeof patch.delta === 'number' ? patch.delta : 1,
+          category: (patch.category ?? '学习') as ScoreCategory,
+          enabled: patch.enabled ?? true,
+          icon: (patch as any).icon ?? '⭐',
+          scope: (patch as any).scope ?? 'all',
+        })
+      }
+      this.persist()
+      return id
+    },
+    removeScoreRule(ruleId: string) {
+      const idx = this.data.rules.findIndex((x) => x.id === ruleId)
+      if (idx < 0) return
+      this.data.rules.splice(idx, 1)
       this.persist()
     },
     exportData(): string {
