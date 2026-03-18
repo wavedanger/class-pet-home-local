@@ -201,7 +201,7 @@ function resetAll() {
 
 <style scoped>
 .content-wrap {
-  @apply min-h-[640px];
+  @apply min-h-[60vh] lg:min-h-[640px];
 }
 .tabs {
   @apply mt-2 flex items-center gap-6 border-b border-slate-100 pb-2;
