@@ -18,6 +18,9 @@ const importText = ref('')
 const importMsg = ref<string | null>(null)
 
 const newClassName = ref('')
+const addingClass = ref(false)
+const editingClassId = ref<string | null>(null)
+const editClassName = ref('')
 
 function addStudent() {
   formMsg.value = null
@@ -36,6 +39,7 @@ function addStudent() {
 function addClassroom() {
   app.addClassroom(newClassName.value)
   newClassName.value = ''
+  addingClass.value = false
 }
 
 function startImport() {
@@ -47,6 +51,38 @@ function startImport() {
 
 function setActive(id: string) {
   app.setActiveClassroom(id)
+}
+
+function openEditClassroom(id: string) {
+  const c = app.data.classrooms.find((x) => x.id === id)
+  if (!c) return
+  editingClassId.value = id
+  editClassName.value = c.name
+}
+
+function cancelEditClassroom() {
+  editingClassId.value = null
+  editClassName.value = ''
+}
+
+function saveEditClassroom() {
+  if (!editingClassId.value) return
+  const ok = app.updateClassroomName(editingClassId.value, editClassName.value)
+  if (!ok) return
+  editingClassId.value = null
+}
+
+function removeClassroom(id: string) {
+  const c = app.data.classrooms.find((x) => x.id === id)
+  if (!c) return
+  if (app.data.classrooms.length <= 1) {
+    alert('至少需要保留 1 个班级')
+    return
+  }
+  if (!confirm(`确定要删除「${c.name}」吗？该班级的学生与相关记录将一并清理。此操作不可逆。`)) return
+  const ok = app.removeClassroom(id)
+  if (!ok) alert('删除失败：至少需要保留 1 个班级')
+  if (editingClassId.value === id) cancelEditClassroom()
 }
 
 const studentsSorted = computed(() => {
@@ -98,27 +134,52 @@ function removeStudent(id: string) {
             <span class="text-brand-600">🏫</span>
             班级列表
           </div>
-          <button class="icon-btn" title="新增班级" @click="addClassroom">＋</button>
+          <button v-if="!addingClass" class="icon-btn" title="新增班级" @click="addingClass = true">＋</button>
         </div>
 
-        <div class="px-3 pb-2">
-          <input v-model="newClassName" class="w-full rounded-2xl border-slate-200 bg-white" placeholder="新班级名称…" />
-          <div class="mt-2 flex justify-end">
-            <button class="btn-sm" :disabled="!newClassName.trim()" @click="addClassroom">创建</button>
+        <div v-if="addingClass" class="px-3 pb-3">
+          <input v-model="newClassName" class="w-full rounded-2xl border-slate-200 bg-white" placeholder="输入班级名称…" />
+          <div class="mt-2 flex items-center justify-end gap-2 text-xs text-slate-500">
+            <button class="btn-sm text-slate-500" @click="addingClass = false; newClassName = ''">取消</button>
+            <button class="btn-sm" :disabled="!newClassName.trim()" @click="addClassroom">添加</button>
           </div>
         </div>
 
         <div class="class-list">
-          <button
+          <div
             v-for="c in app.data.classrooms"
             :key="c.id"
             class="class-item"
             :class="{ active: c.id === app.data.activeClassroomId }"
+            role="button"
+            tabindex="0"
             @click="setActive(c.id)"
           >
-            <div class="font-semibold truncate">{{ c.name }}</div>
-            <div v-if="c.id === app.data.activeClassroomId" class="tag">当前使用</div>
-          </button>
+            <template v-if="editingClassId === c.id">
+              <input v-model="editClassName" class="class-input" placeholder="班级名称…" @click.stop />
+              <div
+                class="class-actions flex items-center gap-2 shrink-0"
+              >
+                <button class="icon-action-sm" title="取消" @click.stop="cancelEditClassroom">✕</button>
+                <button class="icon-action-sm" title="保存" :disabled="!editClassName.trim()" @click.stop="saveEditClassroom">
+                  ✓
+                </button>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="min-w-0">
+                <div class="font-semibold truncate">{{ c.name }}</div>
+                <div v-if="c.id === app.data.activeClassroomId" class="tag">当前使用</div>
+              </div>
+              <div
+                class="class-actions flex items-center gap-2 shrink-0"
+              >
+                <button class="icon-action-sm" title="编辑" @click.stop="openEditClassroom(c.id)">✎</button>
+                <button class="icon-action-sm" title="删除" @click.stop="removeClassroom(c.id)">🗑</button>
+              </div>
+            </template>
+          </div>
         </div>
       </aside>
 
@@ -189,8 +250,8 @@ function removeStudent(id: string) {
               <div class="text-xs text-slate-500">学号：{{ s.number ?? '—' }}</div>
             </div>
             <div class="ml-auto flex items-center gap-2">
-              <button class="icon-action" title="编辑" @click="openEdit(s.id)">✎</button>
-              <button class="icon-action" title="删除" @click="removeStudent(s.id)">🗑</button>
+              <button class="icon-action" title="编辑" @click.stop="openEdit(s.id)">✎</button>
+              <button class="icon-action" title="删除" @click.stop="removeStudent(s.id)">🗑</button>
             </div>
           </div>
         </div>
@@ -234,10 +295,22 @@ function removeStudent(id: string) {
   @apply p-3 space-y-2;
 }
 .class-item {
-  @apply w-full text-left rounded-2xl border border-transparent bg-white px-4 py-3 shadow-soft hover:border-brand-200 transition;
+  @apply w-full text-left rounded-2xl border border-transparent bg-white px-4 py-3 shadow-soft hover:border-brand-200 transition flex items-center justify-between gap-3 cursor-pointer select-none;
 }
 .class-item.active {
   @apply bg-brand-500 text-white border-brand-600;
+}
+.class-actions {
+  @apply shrink-0;
+}
+.icon-action-sm {
+  @apply h-9 w-9 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.class-item.active .icon-action-sm {
+  @apply border-white/40 bg-white/10 hover:bg-white/15 text-white;
+}
+.class-input {
+  @apply w-full rounded-2xl border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-900;
 }
 .tag {
   @apply mt-2 inline-flex text-xs rounded-full px-2 py-1 bg-white/20 text-white;

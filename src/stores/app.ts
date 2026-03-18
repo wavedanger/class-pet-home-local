@@ -18,16 +18,7 @@ const defaultRules: ScoreRule[] = [
 function seedClassroom(): Classroom {
   const p = firstPet()
   const students: Student[] = [
-    { id: 's1', name: '阿杉', number: '0002', points: 0, badges: 0 },
-    {
-      id: 's2',
-      name: '阿杰',
-      number: '0001',
-      points: 0,
-      badges: 0,
-      pet: p ? { petId: p.id, name: p.name, level: 1, exp: 0 } : undefined,
-    },
-    { id: 's3', name: '阿卷', number: '0003', points: 0, badges: 0 },
+    { id: 's1', name: '阿彬', number: '0001', points: 0, badges: 0 },
   ]
   return { id: 'c1', name: '南光一班', students }
 }
@@ -85,6 +76,10 @@ function normalizeData(data: AppData): AppData {
   for (const c of data.classrooms ?? []) {
     for (const s of c.students ?? []) {
       if (typeof (s as any).badges !== 'number') (s as any).badges = 0
+      if (typeof (s as any).points !== 'number') {
+        const n = Number((s as any).points)
+        ;(s as any).points = Number.isFinite(n) ? n : 0
+      }
     }
   }
   if (!(data as any).shopItems) (data as any).shopItems = seedShopItems()
@@ -109,6 +104,8 @@ export const useAppStore = defineStore('app', {
       batchMode: false,
       batchAction: 'score' as 'score' | 'adopt',
       selectedStudentIds: [] as string[],
+      scoreFx: null as null | { studentId: string; kind: 'plus' | 'minus'; ts: number },
+      levelUp: null as null | { studentId: string; studentName: string; petId: string; level: number; ts: number },
     },
   }),
   getters: {
@@ -187,6 +184,34 @@ export const useAppStore = defineStore('app', {
       this.data.classrooms.push({ id, name: trimmed, students: [] })
       this.data.activeClassroomId = id
       this.persist()
+    },
+    updateClassroomName(classroomId: string, name: string) {
+      const trimmed = name.trim()
+      if (!trimmed) return false
+      const c = this.data.classrooms.find((x) => x.id === classroomId)
+      if (!c) return false
+      c.name = trimmed
+      this.persist()
+      return true
+    },
+    removeClassroom(classroomId: string) {
+      if (this.data.classrooms.length <= 1) return false
+      const idx = this.data.classrooms.findIndex((x) => x.id === classroomId)
+      if (idx < 0) return false
+
+      const removedId = this.data.classrooms[idx].id
+      this.data.classrooms.splice(idx, 1)
+
+      if (this.data.activeClassroomId === removedId) {
+        this.data.activeClassroomId = this.data.classrooms[0]?.id ?? ''
+      }
+
+      // 同步清理该班相关记录（MVP 简化）
+      this.data.records = this.data.records.filter((r) => r.classroomId !== removedId)
+      this.data.shopRecords = this.data.shopRecords.filter((r) => r.classroomId !== removedId)
+
+      this.persist()
+      return true
     },
     addStudentToActiveClassroom(name: string, number?: string) {
       const c = this.activeClassroom
@@ -347,12 +372,30 @@ export const useAppStore = defineStore('app', {
       const s = c.students.find((x) => x.id === studentId)
       if (!s) return
 
+      // 兼容旧数据（points 可能被序列化为 string）
+      const curPoints = Number((s as any).points)
+      if (!Number.isFinite(curPoints)) (s as any).points = 0
+      else (s as any).points = curPoints
+
+      const before = {
+        points: s.points,
+        badges: s.badges,
+        pet: s.pet ? { ...s.pet } : undefined,
+      }
+
       const delta = rule.delta
-      s.points += delta
-      if (s.points < 0) s.points = 0
+      const fx = delta >= 0 ? ('plus' as const) : ('minus' as const)
+      const ts = Date.now()
+      this.ui.scoreFx = { studentId: s.id, kind: fx, ts }
+      globalThis.setTimeout(() => {
+        if (this.ui.scoreFx?.ts === ts) this.ui.scoreFx = null
+      }, 900)
+
+      s.points = Math.max(0, Math.floor(s.points + delta))
 
       // 经验：加分增加，扣分不减少经验（MVP 简化）
       if (delta > 0 && s.pet) {
+        const beforeLv = s.pet.level
         s.pet.exp += delta
         // 升级（最多 10 级）
         const maxLv = this.data.growth.maxLevel
@@ -365,6 +408,11 @@ export const useAppStore = defineStore('app', {
           s.pet.exp -= this.expNeed(maxLv)
           s.badges += 1
         }
+
+        if (s.pet.level > beforeLv) {
+          const lvTs = Date.now()
+          this.ui.levelUp = { studentId: s.id, studentName: s.name, petId: s.pet.petId, level: s.pet.level, ts: lvTs }
+        }
       }
 
       this.data.records.unshift({
@@ -376,9 +424,39 @@ export const useAppStore = defineStore('app', {
         delta,
         ruleTitle: rule.title,
         category: rule.category,
+        before,
       })
 
       this.persist()
+    },
+    closeLevelUp() {
+      this.ui.levelUp = null
+    },
+    undoScoreRecord(recordId: string) {
+      const idx = this.data.records.findIndex((r) => r.id === recordId)
+      if (idx < 0) return { ok: false as const, reason: '记录不存在' }
+      const r = this.data.records[idx]
+      if (!r.before) return { ok: false as const, reason: '该记录不支持撤回（旧版本数据）' }
+
+      const c = this.data.classrooms.find((x) => x.id === r.classroomId)
+      if (!c) return { ok: false as const, reason: '班级不存在' }
+      const s = c.students.find((x) => x.id === r.studentId)
+      if (!s) return { ok: false as const, reason: '学生不存在' }
+
+      s.points = r.before.points
+      s.badges = r.before.badges
+      if (r.before.pet) s.pet = { ...r.before.pet }
+      else delete (s as any).pet
+
+      this.data.records.splice(idx, 1)
+      this.persist()
+      return { ok: true as const }
+    },
+    undoLatestScoreRecord(classroomId?: string) {
+      const cid = classroomId ?? this.activeClassroom.id
+      const r = this.data.records.find((x) => x.classroomId === cid)
+      if (!r) return { ok: false as const, reason: '暂无可撤回的记录' }
+      return this.undoScoreRecord(r.id)
     },
     applyRuleForStudents(studentIds: string[], rule: ScoreRule) {
       for (const id of studentIds) this.applyRule(id, rule)

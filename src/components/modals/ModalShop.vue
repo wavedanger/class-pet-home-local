@@ -12,7 +12,6 @@ const tab = ref<Tab>('items')
 const active = computed(() => app.activeClassroom)
 const students = computed(() => active.value.students)
 const selectedStudentId = ref<string>(students.value[0]?.id ?? '')
-
 const selectedStudent = computed(() => students.value.find((s) => s.id === selectedStudentId.value) ?? students.value[0])
 
 const items = computed(() => app.data.shopItems.filter((x) => x.enabled))
@@ -29,34 +28,112 @@ function redeem(itemId: string) {
   else msg.value = '兑换成功'
 }
 
+// 兑换：学生选择（可搜索）
+const pickerOpen = ref(false)
+const pickerItemId = ref<string | null>(null)
+const pickerQuery = ref('')
+
+const pickerItem = computed(() => {
+  if (!pickerItemId.value) return null
+  return app.data.shopItems.find((x) => x.id === pickerItemId.value) ?? null
+})
+
+const pickerStudents = computed(() => {
+  const q = pickerQuery.value.trim()
+  const list = students.value
+  if (!q) return list
+  return list.filter((s) => s.name.includes(q) || (s.number ?? '').includes(q))
+})
+
+function openPicker(itemId: string) {
+  pickerItemId.value = itemId
+  pickerQuery.value = ''
+  pickerOpen.value = true
+}
+
+function closePicker() {
+  pickerOpen.value = false
+  pickerItemId.value = null
+  pickerQuery.value = ''
+}
+
+function redeemForStudent(studentId: string) {
+  if (!pickerItemId.value) return
+  msg.value = null
+  const res = app.redeemShopItem(studentId, pickerItemId.value)
+  if (!res.ok) msg.value = res.reason
+  else msg.value = '兑换成功'
+  closePicker()
+}
+
 // 管理：编辑器（MVP：同弹窗内简化表单）
 const editing = ref<ShopItem | null>(null)
+const showEditor = ref(false)
 const editTitle = ref('')
 const editDesc = ref('')
 const editPrice = ref(1)
 const editStock = ref(10)
 const editCategory = ref<ShopItemCategory>('美食')
 const editIcon = ref('🎁')
+const showIconPicker = ref(false)
+
+const iconPresets = [
+  '🍪',
+  '🍭',
+  '🍫',
+  '🍬',
+  '🥤',
+  '🍎',
+  '🍌',
+  '🍊',
+  '🧃',
+  '🍿',
+  '✏️',
+  '🖊️',
+  '📚',
+  '📓',
+  '📒',
+  '📦',
+  '🎁',
+  '🏅',
+  '🎟️',
+  '⭐',
+  '🌟',
+  '🎮',
+  '🎲',
+  '🧩',
+  '🎨',
+  '🎵',
+  '🏀',
+  '⚽',
+  '🏸',
+  '🎬',
+  '🧸',
+]
 
 function startCreate() {
   editing.value = null
+  showEditor.value = true
   editTitle.value = ''
   editDesc.value = ''
   editPrice.value = 10
   editStock.value = 10
   editCategory.value = '美食'
   editIcon.value = '🍪'
+  showIconPicker.value = false
   msg.value = null
 }
 
 function startEdit(item: ShopItem) {
   editing.value = item
+  showEditor.value = true
   editTitle.value = item.title
   editDesc.value = item.description
   editPrice.value = item.priceBadges
   editStock.value = item.stock
   editCategory.value = item.category
   editIcon.value = item.icon
+  showIconPicker.value = false
   msg.value = null
 }
 
@@ -73,6 +150,8 @@ function saveItem() {
   })
   msg.value = `已保存商品：${id}`
   editing.value = null
+  showEditor.value = false
+  showIconPicker.value = false
 }
 
 function removeItem(item: ShopItem) {
@@ -95,21 +174,7 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
       <button class="tab" :class="{ active: tab === 'manage' }" @click="tab = 'manage'">🎛 管理商品</button>
     </div>
 
-    <div v-if="msg" class="mt-3 text-sm" :class="msg.includes('成功') ? 'text-emerald-700' : 'text-rose-700'">
-      {{ msg }}
-    </div>
-
     <div v-if="tab === 'items'" class="mt-4">
-      <div class="flex flex-wrap items-center gap-3 mb-4">
-        <div class="text-sm text-slate-600">兑换给：</div>
-        <select v-model="selectedStudentId" class="rounded-2xl border-slate-200 bg-white">
-          <option v-for="s in students" :key="s.id" :value="s.id">{{ s.name }}（徽章 {{ s.badges }}）</option>
-        </select>
-        <div v-if="selectedStudent" class="ml-auto pill">
-          当前徽章：<span class="font-semibold">{{ selectedStudent.badges }}</span>
-        </div>
-      </div>
-
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div v-for="it in items" :key="it.id" class="item-card">
           <div class="flex items-start justify-between gap-3">
@@ -124,10 +189,47 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
             <div class="stock">库存 {{ it.stock < 0 ? '∞' : it.stock }}</div>
             <button
               class="btn-buy"
-              :disabled="!selectedStudent || selectedStudent.badges < it.priceBadges || it.stock === 0"
-              @click="redeem(it.id)"
+              :disabled="it.stock === 0"
+              @click="openPicker(it.id)"
             >
               立即兑换
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="pickerOpen && pickerItem" class="picker-mask" @click="closePicker">
+        <div class="picker-modal" @click.stop>
+          <div class="picker-title">
+            <div class="text-lg font-semibold">
+              谁要兑换 <span class="text-brand-600">{{ pickerItem.title }}</span>？
+            </div>
+            <button class="picker-x" @click="closePicker">✕</button>
+          </div>
+
+          <div class="picker-search">
+            <span class="picker-search-ic">🔎</span>
+            <input v-model="pickerQuery" class="picker-input" placeholder="搜索学生…" />
+          </div>
+
+          <div class="picker-list">
+            <button
+              v-for="s in pickerStudents"
+              :key="s.id"
+              class="picker-row"
+              :disabled="s.badges < pickerItem.priceBadges || pickerItem.stock === 0"
+              @click="redeemForStudent(s.id)"
+            >
+              <div class="picker-left">
+                <div class="picker-avatar">{{ s.name.slice(0, 1) }}</div>
+                <div class="min-w-0">
+                  <div class="font-medium truncate">{{ s.name }}</div>
+                  <div class="text-xs text-slate-500">徽章：{{ s.badges }}</div>
+                </div>
+              </div>
+              <div class="picker-right">
+                <span v-if="s.badges < pickerItem.priceBadges" class="picker-bad">不足</span>
+              </div>
             </button>
           </div>
         </div>
@@ -183,7 +285,7 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
           </div>
         </div>
 
-        <div class="rounded-3xl border border-slate-200 bg-white p-4">
+        <div v-if="showEditor" class="rounded-3xl border border-slate-200 bg-white p-4">
           <div class="font-semibold mb-3">{{ editing ? '编辑商品' : '添加商品' }}</div>
           <div class="grid grid-cols-1 gap-3">
             <div class="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3">
@@ -202,10 +304,37 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
               <textarea v-model="editDesc" rows="3" class="input" placeholder="简单描述这个商品的作用…" />
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-[1fr_220px_220px] gap-3 items-end">
-              <div>
-                <div class="label">选择图标（占位）</div>
-                <input v-model="editIcon" class="input" placeholder="🍪/🎁/🪪…" />
+            <div class="grid grid-cols-1 sm:grid-cols-[60px_1fr_150px] gap-3 items-end">
+              <div class="relative">
+                <div class="label">图标</div>
+                <button
+                  type="button"
+                  class="icon-pick"
+                  title="选择图标"
+                  @click="showIconPicker = !showIconPicker"
+                >
+                  <span class="text-xl">{{ editIcon || '🎁' }}</span>
+                </button>
+
+                <div v-if="showIconPicker" class="picker" @click.stop>
+                  <div class="picker-head">
+                    <div class="text-xs text-slate-500">点击选择，也可手动输入</div>
+                    <button class="picker-close" type="button" @click="showIconPicker = false">✕</button>
+                  </div>
+                  <div class="picker-grid">
+                    <button
+                      v-for="ic in iconPresets"
+                      :key="ic"
+                      type="button"
+                      class="pick-btn"
+                      :class="ic === editIcon ? 'active' : ''"
+                      @click="editIcon = ic; showIconPicker = false"
+                    >
+                      {{ ic }}
+                    </button>
+                  </div>
+                  <input v-model="editIcon" class="input mt-3" placeholder="也可以手动输入：🍪/🎁/🪪…" />
+                </div>
               </div>
               <div>
                 <div class="label">分类</div>
@@ -224,7 +353,7 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
             </div>
 
             <div class="actions">
-              <button class="btn" @click="editing = null">取消</button>
+              <button class="btn" @click="editing = null; showEditor = false; showIconPicker = false">取消</button>
               <button class="btn-primary" @click="saveItem">✓ 保存更改</button>
             </div>
           </div>
@@ -298,6 +427,27 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
 .icon-sm {
   @apply h-10 w-10 rounded-2xl bg-brand-50 grid place-items-center text-xl;
 }
+.icon-pick {
+  @apply h-10 w-14 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center;
+}
+.picker {
+  @apply absolute left-0 top-[56px] z-10 w-[280px] rounded-3xl border border-slate-200 bg-white shadow-soft p-3;
+}
+.picker-head {
+  @apply flex items-center justify-between mb-2;
+}
+.picker-close {
+  @apply h-8 w-8 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center text-slate-500;
+}
+.picker-grid {
+  @apply grid grid-cols-8 gap-1;
+}
+.pick-btn {
+  @apply h-9 w-9 rounded-2xl border border-transparent hover:bg-slate-50 transition grid place-items-center text-xl;
+}
+.pick-btn.active {
+  @apply bg-brand-50 border border-brand-200;
+}
 .icon-btn {
   @apply h-10 w-10 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center;
 }
@@ -315,6 +465,51 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
 }
 .btn-primary {
   @apply rounded-2xl px-6 py-2 text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft;
+}
+.picker-mask {
+  @apply fixed inset-0 z-50 bg-black/30 grid place-items-center p-4;
+}
+.picker-modal {
+  @apply w-full max-w-xl rounded-3xl bg-white shadow-soft border border-slate-100 overflow-hidden;
+}
+.picker-title {
+  @apply px-6 py-5 flex items-center justify-between;
+}
+.picker-x {
+  @apply h-9 w-9 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center text-slate-500;
+}
+.picker-search {
+  @apply px-6 pb-4;
+}
+.picker-search-ic {
+  @apply absolute;
+}
+.picker-search {
+  @apply relative;
+}
+.picker-search-ic {
+  @apply left-9 top-1/2 -translate-y-1/2 text-slate-400;
+}
+.picker-input {
+  @apply w-full rounded-2xl border border-brand-400 bg-white pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-brand-100;
+}
+.picker-list {
+  @apply px-6 pb-6 space-y-2 max-h-[50vh] overflow-auto;
+}
+.picker-row {
+  @apply w-full flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white px-4 py-4 hover:border-brand-200 transition disabled:opacity-60 disabled:cursor-not-allowed;
+}
+.picker-left {
+  @apply flex items-center gap-3 min-w-0;
+}
+.picker-avatar {
+  @apply h-10 w-10 rounded-full bg-slate-100 grid place-items-center font-semibold text-slate-600 shrink-0;
+}
+.picker-right {
+  @apply text-sm text-slate-400;
+}
+.picker-bad {
+  @apply text-sm text-slate-400;
 }
 </style>
 

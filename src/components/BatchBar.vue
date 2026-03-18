@@ -5,19 +5,6 @@ import { useAppStore } from '@/stores/app'
 const app = useAppStore()
 const count = computed(() => app.ui.selectedStudentIds.length)
 
-const canAdopt = computed(() => {
-  if (count.value === 0) return false
-  const c = app.activeClassroom
-  const set = new Set(app.ui.selectedStudentIds)
-  // 只要存在“未领养”就允许批量领养（默认仅对未领养生效）
-  return c.students.some((s) => set.has(s.id) && !s.pet)
-})
-
-function adoptBatch() {
-  app.setBatchAction('adopt')
-  if (app.ui.selectedStudentIds.length === 0) return
-  app.openModalForStudents('adopt', app.ui.selectedStudentIds)
-}
 
 function scoreBatch() {
   app.setBatchAction('score')
@@ -46,14 +33,6 @@ function scoreBatch() {
             @click="scoreBatch"
           >
             批量评价
-          </button>
-          <button
-            class="btn-primary"
-            :class="{ active: app.ui.batchAction === 'adopt' }"
-            :disabled="!canAdopt"
-            @click="adoptBatch"
-          >
-            批量领养
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAppStore } from '@/stores/app'
+import type { ScoreRule } from '@/lib/models'
 
 import ModalBase from '@/components/modals/ModalBase.vue'
 
@@ -22,6 +23,12 @@ const categories = computed(() => {
 const rulesInCategory = computed(() =>
   app.data.rules.filter((r) => r.enabled && r.category === app.ui.modalCategory)
 )
+
+function pickRule(r: ScoreRule) {
+  if (isBatch.value) app.applyRuleForStudents(targetIds.value, r)
+  else app.applyRule(student.value.id, r)
+  app.closeModal()
+}
 </script>
 
 <template>
@@ -46,12 +53,12 @@ const rulesInCategory = computed(() =>
     </div>
 
     <div class="max-h-[55vh] overflow-auto pr-2">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div class="rule-grid gap-3">
         <button
           v-for="r in rulesInCategory"
           :key="r.id"
           class="rule-card"
-          @click="isBatch ? app.applyRuleForStudents(targetIds, r) : app.applyRule(student.id, r)"
+          @click="pickRule(r)"
         >
           <div class="font-medium text-slate-900">{{ r.title }}</div>
           <div class="mt-2">
@@ -81,7 +88,41 @@ const rulesInCategory = computed(() =>
   @apply bg-brand-50 border-brand-300 text-brand-700;
 }
 .rule-card {
-  @apply rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-brand-300 hover:bg-brand-50 transition;
+  @apply rounded-2xl border border-slate-200 bg-white p-4 text-left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  z-index: 0;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.rule-card:hover {
+  z-index: 1;
+  border-color: rgba(245, 158, 11, 0.55);
+  background-color: rgba(255, 251, 235, 1);
+  box-shadow:
+    0 10px 28px rgba(15, 23, 42, 0.08),
+    0 2px 10px rgba(15, 23, 42, 0.05);
+}
+.rule-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 640px) {
+  .rule-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1024px) {
+  .rule-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+.rule-card:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
 }
 .badge {
   @apply inline-flex items-center rounded-xl px-2 py-1 text-xs font-semibold;

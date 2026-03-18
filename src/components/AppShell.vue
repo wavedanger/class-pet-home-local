@@ -12,10 +12,17 @@ import SortMenu from '@/components/SortMenu.vue'
 import ModalClassManager from '@/components/modals/ModalClassManager.vue'
 import ModalShop from '@/components/modals/ModalShop.vue'
 import BatchBar from '@/components/BatchBar.vue'
+import LevelUpOverlay from '@/components/LevelUpOverlay.vue'
 
 const app = useAppStore()
 
 const activeName = computed(() => app.activeClassroom?.name ?? '')
+
+function undoLatest() {
+  const res = app.undoLatestScoreRecord()
+  if (!res.ok) window.alert(res.reason)
+  else window.alert('已撤回最近一条评价')
+}
 </script>
 
 <template>
@@ -44,8 +51,8 @@ const activeName = computed(() => app.activeClassroom?.name ?? '')
         </button>
       </div>
 
-      <div class="mx-auto max-w-6xl px-4 pb-3 flex items-center gap-3">
-        <div class="flex-1">
+      <div class="mx-auto max-w-6xl px-4 pb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div class="w-full sm:flex-1">
           <div class="relative">
             <input
               v-model="app.ui.query"
@@ -56,12 +63,12 @@ const activeName = computed(() => app.activeClassroom?.name ?? '')
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="mt-2 sm:mt-0 flex flex-wrap justify-end gap-2">
           <SortMenu />
           <button class="btn" @click="app.openModal('leaderboard')">排行榜</button>
           <button class="btn" @click="app.openModal('shop')">小商店</button>
           <button class="btn" @click="app.openModal('records')">评价记录</button>
-          <button class="btn">撤回评价</button>
+          <button class="btn" @click="undoLatest">撤回评价</button>
           <button class="btn-primary" @click="app.ui.batchMode ? app.exitBatchMode() : app.enterBatchMode()">
             {{ app.ui.batchMode ? '退出批量' : '批量评价' }}
           </button>
@@ -82,15 +89,17 @@ const activeName = computed(() => app.activeClassroom?.name ?? '')
     <ModalShop v-if="app.ui.modal === 'shop'" />
 
     <BatchBar v-if="app.ui.batchMode" />
+
+    <LevelUpOverlay v-if="app.ui.levelUp" />
   </div>
 </template>
 
 <style scoped>
 .btn {
-  @apply rounded-2xl px-4 py-2 text-sm border border-slate-200 bg-white/80 hover:bg-white transition;
+  @apply rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm border border-slate-200 bg-white/80 hover:bg-white transition;
 }
 .btn-primary {
-  @apply rounded-2xl px-4 py-2 text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft;
+  @apply rounded-2xl px-3 sm:px-4 py-2 text-xs sm:text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft;
 }
 .btn-ghost {
   @apply rounded-2xl px-4 py-2 text-sm border border-slate-200 bg-white/60 hover:bg-white transition;

@@ -11,6 +11,12 @@ const records = computed(() => app.data.records.filter((r) => r.classroomId === 
 const studentName = (id: string) => app.activeClassroom.students.find((s) => s.id === id)?.name ?? '未知学生'
 
 const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
+
+function undo(id: string) {
+  const res = app.undoScoreRecord(id)
+  if (!res.ok) alert(res.reason)
+  else alert('已撤回')
+}
 </script>
 
 <template>
@@ -29,10 +35,11 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
           <div class="font-medium truncate">{{ studentName(r.studentId) }} · {{ r.ruleTitle }}</div>
           <div class="text-xs text-slate-500 mt-1">{{ r.category }} · {{ fmt(r.ts) }}</div>
         </div>
-        <div class="shrink-0">
+        <div class="shrink-0 flex items-center gap-3">
           <span class="badge" :class="r.delta >= 0 ? 'plus' : 'minus'">
             {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
           </span>
+          <button class="btn-undo" :disabled="!r.before" @click="undo(r.id)">撤回</button>
         </div>
       </div>
     </div>
@@ -55,6 +62,9 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
 }
 .btn {
   @apply rounded-2xl px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 transition;
+}
+.btn-undo {
+  @apply rounded-2xl px-3 py-1.5 text-xs border border-slate-200 bg-white hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed;
 }
 </style>
 

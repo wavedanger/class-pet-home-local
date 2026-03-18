@@ -46,6 +46,12 @@ export type ScoreRecord = {
   delta: number
   ruleTitle: string
   category: ScoreCategory
+  // 用于“撤回评价”：记录操作前的学生关键状态（兼容旧数据可缺省）
+  before?: {
+    points: number
+    badges: number
+    pet?: PetState
+  }
 }
 
 export type ShopItemCategory = '美食' | '文具' | '娱乐' | '特权' | '杂项'
