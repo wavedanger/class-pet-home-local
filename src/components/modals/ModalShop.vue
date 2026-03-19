@@ -266,9 +266,9 @@ const fmt = (ts: number) => new Date(ts).toLocaleString('zh-CN')
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        <div class="rounded-3xl border border-slate-200 bg-white p-4">
+          <div class="rounded-3xl border border-slate-200 bg-white p-4 flex flex-col min-h-0">
           <div class="font-semibold mb-3">商品列表</div>
-          <div class="space-y-2 max-h-[55vh] overflow-auto pr-2">
+          <div class="space-y-2 flex-1 min-h-0 overflow-auto pr-2">
             <div v-for="it in app.data.shopItems" :key="it.id" class="manage-item">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="icon-sm">{{ it.icon }}</div>

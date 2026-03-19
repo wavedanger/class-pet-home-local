@@ -39,47 +39,55 @@ function pickRule(r: ScoreRule) {
       <span class="text-slate-500 text-sm ml-2" v-else>（{{ student.name }}）</span>
     </template>
 
-    <div class="flex items-center gap-2 mb-4 overflow-auto">
-      <button
-        v-for="c in categories"
-        :key="c"
-        class="tab"
-        :class="{ active: app.ui.modalCategory === c }"
-        @click="app.ui.modalCategory = c"
-      >
-        {{ c }}
-      </button>
-    </div>
-
-    <div class="max-h-[55vh] overflow-auto pr-2">
-      <div class="rule-grid gap-3">
+    <div class="modal-col">
+      <div class="flex items-center gap-2 mb-4 overflow-auto">
         <button
-          v-for="r in rulesInCategory"
-          :key="r.id"
-          class="rule-card"
-          @click="pickRule(r)"
+          v-for="c in categories"
+          :key="c"
+          class="tab"
+          :class="{ active: app.ui.modalCategory === c }"
+          @click="app.ui.modalCategory = c"
         >
-          <div class="font-medium text-slate-900">{{ r.title }}</div>
-          <div class="mt-2">
-            <span class="badge" :class="r.delta >= 0 ? 'plus' : 'minus'">
-              {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
-            </span>
-          </div>
+          {{ c }}
         </button>
       </div>
 
-      <div v-if="rulesInCategory.length === 0" class="text-slate-500 text-sm py-10 text-center">
-        当前分类没有启用的规则（MVP 占位）。
-      </div>
-    </div>
+      <div class="modal-scroll pr-2">
+        <div class="rule-grid gap-3">
+          <button
+            v-for="r in rulesInCategory"
+            :key="r.id"
+            class="rule-card"
+            @click="pickRule(r)"
+          >
+            <div class="font-medium text-slate-900">{{ r.title }}</div>
+            <div class="mt-2">
+              <span class="badge" :class="r.delta >= 0 ? 'plus' : 'minus'">
+                {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
+              </span>
+            </div>
+          </button>
+        </div>
 
-    <div class="mt-6 flex justify-end">
-      <button class="btn" @click="app.closeModal()">关闭</button>
+        <div v-if="rulesInCategory.length === 0" class="text-slate-500 text-sm py-10 text-center">
+          当前分类没有启用的规则（MVP 占位）。
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button class="btn" @click="app.closeModal()">关闭</button>
+      </div>
     </div>
   </ModalBase>
 </template>
 
 <style scoped>
+.modal-col {
+  @apply h-full flex flex-col min-h-0;
+}
+.modal-scroll {
+  @apply flex-1 min-h-0 overflow-auto;
+}
 .tab {
   @apply rounded-2xl px-3 py-1.5 text-sm border border-slate-200 bg-white hover:bg-slate-50 transition whitespace-nowrap;
 }

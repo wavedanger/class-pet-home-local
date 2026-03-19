@@ -56,34 +56,42 @@ function exportExcel() {
       <button class="btn-head" :disabled="records.length === 0" @click="exportExcel">📄 导出 Excel</button>
     </template>
 
-    <div v-if="records.length === 0" class="text-slate-500 text-sm py-10 text-center">暂无记录</div>
+    <div class="modal-col">
+      <div v-if="records.length === 0" class="text-slate-500 text-sm py-10 text-center">暂无记录</div>
 
-    <div v-else class="space-y-2 max-h-[60vh] overflow-auto pr-2">
-      <div
-        v-for="r in records"
-        :key="r.id"
-        class="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-4"
-      >
-        <div class="min-w-0">
-          <div class="font-medium truncate">{{ studentName(r.studentId) }} · {{ r.ruleTitle }}</div>
-          <div class="text-xs text-slate-500 mt-1">{{ r.category }} · {{ fmt(r.ts) }}</div>
-        </div>
-        <div class="shrink-0 flex items-center gap-3">
-          <span class="badge" :class="r.delta >= 0 ? 'plus' : 'minus'">
-            {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
-          </span>
-          <button class="btn-undo" :disabled="!r.before" @click="undo(r.id)">撤回</button>
+      <div v-else class="modal-scroll pr-2 space-y-2">
+        <div
+          v-for="r in records"
+          :key="r.id"
+          class="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-4"
+        >
+          <div class="min-w-0">
+            <div class="font-medium truncate">{{ studentName(r.studentId) }} · {{ r.ruleTitle }}</div>
+            <div class="text-xs text-slate-500 mt-1">{{ r.category }} · {{ fmt(r.ts) }}</div>
+          </div>
+          <div class="shrink-0 flex items-center gap-3">
+            <span class="badge" :class="r.delta >= 0 ? 'plus' : 'minus'">
+              {{ r.delta >= 0 ? '+' : '' }}{{ r.delta }}
+            </span>
+            <button class="btn-undo" :disabled="!r.before" @click="undo(r.id)">撤回</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="mt-6 flex justify-end">
-      <button class="btn" @click="app.closeModal()">关闭</button>
+      <div class="mt-6 flex justify-end">
+        <button class="btn" @click="app.closeModal()">关闭</button>
+      </div>
     </div>
   </ModalBase>
 </template>
 
 <style scoped>
+.modal-col {
+  @apply h-full flex flex-col min-h-0;
+}
+.modal-scroll {
+  @apply flex-1 min-h-0 overflow-auto;
+}
 .badge {
   @apply inline-flex items-center rounded-xl px-2 py-1 text-xs font-semibold;
 }
