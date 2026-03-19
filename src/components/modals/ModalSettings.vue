@@ -7,6 +7,13 @@ import ModalBase from '@/components/modals/ModalBase.vue'
 const app = useAppStore()
 type Tab = 'rules' | 'growth' | 'data' | 'about'
 const tab = ref<Tab>('rules')
+watch(
+  () => tab.value,
+  (v) => {
+    if (v === 'data') void initAutoBackupPanel()
+  },
+  { immediate: true }
+)
 
 // --- 规则页
 const categories = computed(() => {
@@ -243,6 +250,62 @@ function doImport() {
     importErr.value = e?.message ? String(e.message) : '导入失败：JSON 格式不正确或版本不支持'
   }
 }
+
+const autoBackupSupported = computed(() => (app as any).ui && true)
+const fmtTs = (ts: number) => new Date(ts).toLocaleString('zh-CN')
+const autoBackupIntervalDraft = ref<number | null>(null)
+
+async function initAutoBackupPanel() {
+  await app.refreshAutoBackupTarget()
+  autoBackupIntervalDraft.value = app.ui.autoBackupIntervalSec || 60
+}
+
+function commitAutoBackupInterval() {
+  const v = autoBackupIntervalDraft.value
+  if (v === null || !Number.isFinite(Number(v))) {
+    autoBackupIntervalDraft.value = app.ui.autoBackupIntervalSec || 60
+    return
+  }
+  app.setAutoBackupIntervalSec(v)
+  autoBackupIntervalDraft.value = app.ui.autoBackupIntervalSec || 60
+}
+
+async function toggleAutoBackup(next: boolean) {
+  app.setAutoBackupEnabled(next)
+  if (next) {
+    await app.refreshAutoBackupTarget()
+    if (app.ui.autoBackupHasTarget) {
+      await app.runAutoBackupOnce()
+      msg.value = '已开启自动备份'
+    } else {
+      msg.value = '已开启自动备份：请先选择备份文件'
+    }
+  } else {
+    msg.value = '已关闭自动备份'
+  }
+}
+
+async function pickAutoBackup() {
+  try {
+    await app.pickAutoBackupFile()
+    msg.value = '已选择备份文件'
+    if (app.ui.autoBackupEnabled) await app.runAutoBackupOnce()
+  } catch (e: any) {
+    const name = e?.name ? String(e.name) : ''
+    const message = e?.message ? String(e.message) : ''
+    // 用户点击“取消”属于正常流程，不提示错误
+    if (name === 'AbortError' || /aborted/i.test(message)) {
+      msg.value = '已取消选择'
+      return
+    }
+    msg.value = message || '选择备份文件失败'
+  }
+}
+
+async function clearAutoBackup() {
+  await app.clearAutoBackupFile()
+  msg.value = '已清除备份目标'
+}
 </script>
 
 <template>
@@ -460,9 +523,61 @@ function doImport() {
           <div class="text-sm text-slate-600 mt-1">将当前数据导出为 JSON，或导入 JSON 初始化/迁移数据</div>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn" @click="copyExportJson">复制导出</button>
-          <button class="btn" @click="downloadExportJson">下载导出</button>
+          <button class="btn" @click="copyExportJson">📋 复制导出</button>
+          <button class="btn" @click="downloadExportJson">⬇️ 下载导出</button>
           <button class="btn-primary" @click="openDataIo">💾 导入数据</button>
+        </div>
+      </div>
+
+      <div class="mt-4 rounded-3xl border border-slate-200 bg-white px-6 py-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="font-semibold flex items-center gap-2">⏱ 自动备份到本地文件</div>
+            <div class="text-sm text-slate-600 mt-1">
+              首次需要选择一个备份文件位置并授权；开启后每
+              <input
+                class="inline-num"
+                type="number"
+                min="10"
+                max="3600"
+                step="1"
+                v-model.number="autoBackupIntervalDraft"
+                placeholder="60"
+                @blur="commitAutoBackupInterval"
+                @keydown.enter.prevent="commitAutoBackupInterval"
+              />
+              秒自动写入一次（关闭标签页前也会尝试保存一次）
+            </div>
+          </div>
+          <div class="shrink-0 flex items-center gap-2">
+            <button
+              :class="app.ui.autoBackupEnabled ? 'btn' : 'btn-primary'"
+              @click="toggleAutoBackup(!app.ui.autoBackupEnabled)"
+            >
+              {{ app.ui.autoBackupEnabled ? '⏸ 关闭自动备份' : '▶ 开启自动备份' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button class="btn" @click="pickAutoBackup">选择备份文件</button>
+          <button class="btn" :disabled="!app.ui.autoBackupHasTarget" @click="app.runAutoBackupOnce()">立即备份</button>
+          <button class="btn" :disabled="!app.ui.autoBackupHasTarget" @click="clearAutoBackup">清除目标</button>
+        </div>
+
+        <div class="mt-3 text-sm text-slate-600">
+          <div>状态：<span class="font-semibold">{{ app.ui.autoBackupEnabled ? '已开启' : '已关闭' }}</span></div>
+          <div>
+            目标文件：
+            <span class="font-semibold">
+              {{ app.ui.autoBackupHasTarget ? '已选择' : '未选择' }}
+            </span>
+            <span v-if="app.ui.autoBackupHasTarget && app.ui.autoBackupTargetName" class="ml-2 text-xs text-slate-400">
+              {{ app.ui.autoBackupTargetName }}
+            </span>
+          </div>
+          <div v-if="app.ui.autoBackupLastOkAt">最近成功：{{ fmtTs(app.ui.autoBackupLastOkAt) }}</div>
+          <div v-if="app.ui.autoBackupLastError" class="text-rose-700">最近错误：{{ app.ui.autoBackupLastError }}</div>
         </div>
       </div>
 
@@ -684,6 +799,9 @@ function doImport() {
 .btn-lite {
   @apply rounded-2xl px-5 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 transition;
 }
+.btn {
+  @apply rounded-2xl px-4 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed;
+}
 .btn-primary {
   @apply rounded-2xl px-5 py-2 text-sm bg-brand-500 text-white hover:bg-brand-600 transition shadow-soft disabled:opacity-50 disabled:cursor-not-allowed;
 }
@@ -713,6 +831,9 @@ function doImport() {
 }
 .inline-input {
   @apply mx-2 w-20 rounded-xl border-slate-200 bg-white text-center;
+}
+.inline-num {
+  @apply mx-1 w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 align-middle;
 }
 .data {
   @apply mt-4;

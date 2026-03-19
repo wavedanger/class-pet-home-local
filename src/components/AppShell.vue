@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 
 import StudentGrid from '@/components/StudentGrid.vue'
@@ -23,6 +23,22 @@ function undoLatest() {
   if (!res.ok) window.alert(res.reason)
   else window.alert('已撤回最近一条评价')
 }
+
+onMounted(async () => {
+  // 自动备份循环只初始化一次；开关控制是否真正执行写入
+  await app.startAutoBackupLoop()
+})
+
+watch(
+  () => app.ui.autoBackupEnabled,
+  async (v) => {
+    // 关闭时不销毁循环（避免多处组件重复启动），但允许你需要“彻底停止”时调用 stopAutoBackupLoop
+    if (v) {
+      await app.refreshAutoBackupTarget()
+      if (app.ui.autoBackupHasTarget) await app.runAutoBackupOnce()
+    }
+  }
+)
 </script>
 
 <template>

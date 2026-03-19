@@ -2,9 +2,15 @@ import { defineStore } from 'pinia'
 import type { AppData, Classroom, GrowthConfig, PetId, ScoreCategory, ScoreRule, ShopItem, ShopItemCategory, Student } from '@/lib/models'
 import { expToNext, newId } from '@/lib/models'
 import { loadJson, saveJson } from '@/lib/storage'
+import { clearSavedHandle, getSupport, getSavedHandle, pickTargetFile, writeBackupJson } from '@/lib/autoBackup'
 import { firstPet } from '@/lib/pets'
 
 const LS_KEY = 'class-pet-home:data'
+const LS_PREF_AUTO_BACKUP = 'class-pet-home:autoBackupEnabled'
+const LS_PREF_AUTO_BACKUP_INTERVAL = 'class-pet-home:autoBackupIntervalSec'
+
+let autoBackupTimer: number | null = null
+let autoBackupRunning = false
 
 const defaultRules: ScoreRule[] = [
   { id: 'r1', title: '作业完成优秀', delta: 1, category: '学习', enabled: true, icon: '📗', scope: 'all' },
@@ -114,6 +120,12 @@ export const useAppStore = defineStore('app', {
       selectedStudentIds: [] as string[],
       scoreFx: null as null | { studentId: string; kind: 'plus' | 'minus'; ts: number },
       levelUp: null as null | { studentId: string; studentName: string; petId: string; level: number; ts: number },
+      autoBackupEnabled: (loadJson<boolean>(LS_PREF_AUTO_BACKUP) ?? false) as boolean,
+      autoBackupHasTarget: false,
+      autoBackupTargetName: '' as string,
+      autoBackupIntervalSec: (loadJson<number>(LS_PREF_AUTO_BACKUP_INTERVAL) ?? 60) as number,
+      autoBackupLastOkAt: null as null | number,
+      autoBackupLastError: null as null | string,
     },
   }),
   getters: {
@@ -161,6 +173,93 @@ export const useAppStore = defineStore('app', {
   actions: {
     persist() {
       saveJson(LS_KEY, this.data)
+    },
+    setAutoBackupEnabled(v: boolean) {
+      this.ui.autoBackupEnabled = !!v
+      saveJson(LS_PREF_AUTO_BACKUP, this.ui.autoBackupEnabled)
+    },
+    setAutoBackupIntervalSec(sec: number) {
+      const n = Math.floor(Number(sec))
+      // 10s..3600s，防止极端值
+      const clamped = Number.isFinite(n) ? Math.min(3600, Math.max(10, n)) : 60
+      this.ui.autoBackupIntervalSec = clamped
+      saveJson(LS_PREF_AUTO_BACKUP_INTERVAL, clamped)
+      // 让新间隔立即生效
+      this.stopAutoBackupLoop()
+      void this.startAutoBackupLoop()
+    },
+    async refreshAutoBackupTarget() {
+      const support = getSupport()
+      if (!support.supported) {
+        this.ui.autoBackupHasTarget = false
+        this.ui.autoBackupTargetName = ''
+        return false
+      }
+      const handle = await getSavedHandle()
+      this.ui.autoBackupHasTarget = !!handle
+      this.ui.autoBackupTargetName = handle?.name ?? ''
+      return this.ui.autoBackupHasTarget
+    },
+    async pickAutoBackupFile() {
+      const support = getSupport()
+      if (!support.supported) throw new Error(support.reason || '不支持自动备份')
+      await pickTargetFile()
+      await this.refreshAutoBackupTarget()
+    },
+    async clearAutoBackupFile() {
+      await clearSavedHandle()
+      this.ui.autoBackupLastOkAt = null
+      this.ui.autoBackupLastError = null
+      await this.refreshAutoBackupTarget()
+    },
+    async runAutoBackupOnce() {
+      const support = getSupport()
+      if (!support.supported) throw new Error(support.reason || '不支持自动备份')
+      if (autoBackupRunning) return
+      autoBackupRunning = true
+      try {
+        await writeBackupJson(this.exportData())
+        this.ui.autoBackupLastOkAt = Date.now()
+        this.ui.autoBackupLastError = null
+      } catch (e: any) {
+        this.ui.autoBackupLastError = e?.message ? String(e.message) : '自动备份失败'
+      } finally {
+        autoBackupRunning = false
+      }
+    },
+    async startAutoBackupLoop() {
+      // 防重复
+      if (autoBackupTimer) return
+      await this.refreshAutoBackupTarget()
+      // 先跑一次（如果已选择目标）
+      if (this.ui.autoBackupEnabled && this.ui.autoBackupHasTarget) await this.runAutoBackupOnce()
+      autoBackupTimer = window.setInterval(async () => {
+        if (!this.ui.autoBackupEnabled) return
+        await this.refreshAutoBackupTarget()
+        if (!this.ui.autoBackupHasTarget) return
+        await this.runAutoBackupOnce()
+      }, Math.max(10, Math.floor(this.ui.autoBackupIntervalSec || 60)) * 1000)
+
+      const onVis = async () => {
+        if (document.visibilityState !== 'hidden') return
+        if (!this.ui.autoBackupEnabled) return
+        await this.refreshAutoBackupTarget()
+        if (!this.ui.autoBackupHasTarget) return
+        await this.runAutoBackupOnce()
+      }
+      document.addEventListener('visibilitychange', onVis)
+      ;(this as any).__autoBackupOnVis = onVis
+    },
+    stopAutoBackupLoop() {
+      if (autoBackupTimer) {
+        window.clearInterval(autoBackupTimer)
+        autoBackupTimer = null
+      }
+      const onVis = (this as any).__autoBackupOnVis as undefined | (() => void)
+      if (onVis) {
+        document.removeEventListener('visibilitychange', onVis)
+        ;(this as any).__autoBackupOnVis = null
+      }
     },
     expNeed(level: number): number {
       const g = this.data.growth
