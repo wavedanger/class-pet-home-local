@@ -30,9 +30,9 @@ function adopt() {
 <template>
   <ModalBase @close="app.closeModal()">
     <template #title>
-      ✨
-      <span v-if="isBatch">为 {{ targetIds.length }} 位学生批量选择守护神兽</span>
-      <span v-else>为 {{ student.name }} 选择守护神兽</span>
+      ✨ 领养宠物 <span class="chip-en">ADOPT PET</span>
+      <span class="text-slate-500 text-sm ml-2" v-if="isBatch">（批量）</span>
+      <span class="text-slate-500 text-sm ml-2" v-else>（{{ student.name }}）</span>
     </template>
 
     <div class="text-center text-slate-500 mb-4">选择一只可爱的神兽，它会陪你一起成长！</div>

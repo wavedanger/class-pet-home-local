@@ -65,10 +65,10 @@ function undoLatest() {
 
         <div class="mt-2 sm:mt-0 flex flex-wrap justify-end gap-2">
           <SortMenu />
-          <button class="btn" @click="app.openModal('leaderboard')">排行榜</button>
-          <button class="btn" @click="app.openModal('shop')">小商店</button>
-          <button class="btn" @click="app.openModal('records')">评价记录</button>
-          <button class="btn" @click="undoLatest">撤回评价</button>
+          <button class="btn" @click="app.openModal('leaderboard')">🏆 排行榜</button>
+          <button class="btn" @click="app.openModal('shop')">🛍 小商店</button>
+          <button class="btn" @click="app.openModal('records')">🕘 评价记录</button>
+          <button class="btn" @click="undoLatest">↩ 撤回评价</button>
           <button class="btn-primary" @click="app.ui.batchMode ? app.exitBatchMode() : app.enterBatchMode()">
             {{ app.ui.batchMode ? '退出批量' : '批量评价' }}
           </button>

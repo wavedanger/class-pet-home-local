@@ -125,7 +125,7 @@ function removeStudent(id: string) {
 
 <template>
   <ModalBase @close="app.closeModal()">
-    <template #title>班级与学生管理</template>
+    <template #title>🏫 班级与学生管理 <span class="chip-en">CLASS MANAGER</span></template>
 
     <div class="layout">
       <aside class="sidebar">
@@ -149,7 +149,7 @@ function removeStudent(id: string) {
           <div
             v-for="c in app.data.classrooms"
             :key="c.id"
-            class="class-item"
+            class="class-item group"
             :class="{ active: c.id === app.data.activeClassroomId }"
             role="button"
             tabindex="0"
@@ -173,7 +173,7 @@ function removeStudent(id: string) {
                 <div v-if="c.id === app.data.activeClassroomId" class="tag">当前使用</div>
               </div>
               <div
-                class="class-actions flex items-center gap-2 shrink-0"
+                class="class-actions class-actions-hover flex items-center gap-2 shrink-0"
               >
                 <button class="icon-action-sm" title="编辑" @click.stop="openEditClassroom(c.id)">✎</button>
                 <button class="icon-action-sm" title="删除" @click.stop="removeClassroom(c.id)">🗑</button>
@@ -242,14 +242,14 @@ function removeStudent(id: string) {
           <div
             v-for="s in studentsSorted"
             :key="s.id"
-            class="student-item"
+            class="student-item group"
           >
             <div class="avatar">{{ s.name.slice(0, 1) }}</div>
             <div class="min-w-0">
               <div class="font-semibold truncate">{{ s.name }}</div>
               <div class="text-xs text-slate-500">学号：{{ s.number ?? '—' }}</div>
             </div>
-            <div class="ml-auto flex items-center gap-2">
+            <div class="ml-auto flex items-center gap-2 student-actions student-actions-hover">
               <button class="icon-action" title="编辑" @click.stop="openEdit(s.id)">✎</button>
               <button class="icon-action" title="删除" @click.stop="removeStudent(s.id)">🗑</button>
             </div>
@@ -302,6 +302,17 @@ function removeStudent(id: string) {
 }
 .class-actions {
   @apply shrink-0;
+}
+.class-actions-hover {
+  @apply opacity-0 pointer-events-none transition;
+}
+.class-item:hover .class-actions-hover,
+.class-item:focus-within .class-actions-hover {
+  @apply opacity-100 pointer-events-auto;
+}
+.class-item.active:hover .class-actions-hover,
+.class-item.active:focus-within .class-actions-hover {
+  @apply opacity-100 pointer-events-auto;
 }
 .icon-action-sm {
   @apply h-9 w-9 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition grid place-items-center disabled:opacity-50 disabled:cursor-not-allowed;
@@ -368,6 +379,13 @@ function removeStudent(id: string) {
 }
 .student-item {
   @apply rounded-3xl border border-slate-100 bg-white px-4 py-4 shadow-soft flex items-center gap-3 hover:border-brand-200 transition;
+}
+.student-actions-hover {
+  @apply opacity-0 pointer-events-none transition;
+}
+.student-item:hover .student-actions-hover,
+.student-item:focus-within .student-actions-hover {
+  @apply opacity-100 pointer-events-auto;
 }
 .avatar {
   @apply h-12 w-12 rounded-full bg-indigo-600 text-white grid place-items-center font-semibold;

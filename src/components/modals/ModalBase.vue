@@ -41,3 +41,9 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<style scoped>
+:slotted(.chip-en) {
+  @apply ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] tracking-wide border border-slate-200 bg-slate-50 text-slate-500;
+}
+</style>
+

@@ -362,6 +362,8 @@ export const useAppStore = defineStore('app', {
       const c = this.activeClassroom
       const s = c.students.find((x) => x.id === studentId)
       if (!s) return
+      // 更换宠物：清除该学生所有积分
+      if (s.pet) s.points = 0
       s.pet = { petId, name: petName, level: 1, exp: 0 }
       this.persist()
     },
@@ -371,6 +373,8 @@ export const useAppStore = defineStore('app', {
       for (const s of c.students) {
         if (!set.has(s.id)) continue
         if (onlyIfNoPet && s.pet) continue
+        // 批量更换宠物（onlyIfNoPet=false 时）：清除该学生所有积分
+        if (s.pet) s.points = 0
         s.pet = { petId, name: petName, level: 1, exp: 0 }
       }
       this.persist()

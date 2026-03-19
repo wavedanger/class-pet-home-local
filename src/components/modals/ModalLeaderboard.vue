@@ -21,7 +21,7 @@ const list = computed(() => {
 
 <template>
   <ModalBase @close="app.closeModal()">
-    <template #title>🏆 荣誉榜</template>
+    <template #title>🏆 荣誉榜 <span class="chip-en">LEADERBOARD</span></template>
 
     <div class="table-head">
       <div class="col-rank">排名</div>

@@ -247,7 +247,7 @@ function doImport() {
 
 <template>
   <ModalBase @close="app.closeModal()">
-    <template #title>设置与帮助</template>
+    <template #title>⚙ 设置与帮助 <span class="chip-en">SETTINGS</span></template>
 
     <div class="content-wrap">
       <Transition name="toast">

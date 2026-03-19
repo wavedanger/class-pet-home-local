@@ -34,10 +34,9 @@ function pickRule(r: ScoreRule) {
 <template>
   <ModalBase @close="app.closeModal()">
     <template #title>
-      <span v-if="isBatch">
-        给 <span class="text-brand-700">{{ targetIds.length }}</span> 位学生 批量加分/扣分
-      </span>
-      <span v-else>给 <span class="text-brand-700">{{ student.name }}</span> 加分/扣分</span>
+      📝 加分/扣分 <span class="chip-en">SCORE</span>
+      <span class="text-slate-500 text-sm ml-2" v-if="isBatch">（{{ targetIds.length }} 人）</span>
+      <span class="text-slate-500 text-sm ml-2" v-else>（{{ student.name }}）</span>
     </template>
 
     <div class="flex items-center gap-2 mb-4 overflow-auto">

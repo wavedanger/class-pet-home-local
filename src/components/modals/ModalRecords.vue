@@ -21,7 +21,7 @@ function undo(id: string) {
 
 <template>
   <ModalBase @close="app.closeModal()">
-    <template #title>评价记录（最近 50 条）</template>
+    <template #title>🕘 评价记录（最近 50 条） <span class="chip-en">RECORDS</span></template>
 
     <div v-if="records.length === 0" class="text-slate-500 text-sm py-10 text-center">暂无记录</div>
 
