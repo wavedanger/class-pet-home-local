@@ -17,11 +17,44 @@ function undo(id: string) {
   if (!res.ok) alert(res.reason)
   else alert('已撤回')
 }
+
+function exportExcel() {
+  // 使用 CSV 方式导出（Excel 可直接打开）；加 BOM 避免中文乱码
+  const header = ['时间', '学生', '分类', '规则', '加/减', '分值']
+  const rows = records.value.map((r) => {
+    const kind = r.delta >= 0 ? '加分' : '减分'
+    const delta = `${r.delta >= 0 ? '+' : ''}${r.delta}`
+    return [fmt(r.ts), studentName(r.studentId), r.category, r.ruleTitle, kind, delta]
+  })
+  const escape = (v: unknown) => {
+    const s = String(v ?? '')
+    const needs = /[",\r\n]/.test(s)
+    const out = s.replace(/"/g, '""')
+    return needs ? `"${out}"` : out
+  }
+  const csv = [header, ...rows].map((line) => line.map(escape).join(',')).join('\r\n')
+  const bom = '\uFEFF'
+  const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8' })
+
+  const ts = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const file = `评价记录_${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}.csv`
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
   <ModalBase @close="app.closeModal()">
-    <template #title>🕘 评价记录（最近 50 条） <span class="chip-en">RECORDS</span></template>
+    <template #title>
+      🕘 评价记录（最近 50 条） <span class="chip-en">RECORDS</span>
+      <button class="btn-head" :disabled="records.length === 0" @click="exportExcel">📄 导出 Excel</button>
+    </template>
 
     <div v-if="records.length === 0" class="text-slate-500 text-sm py-10 text-center">暂无记录</div>
 
@@ -65,6 +98,9 @@ function undo(id: string) {
 }
 .btn-undo {
   @apply rounded-2xl px-3 py-1.5 text-xs border border-slate-200 bg-white hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-head {
+  @apply ml-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed;
 }
 </style>
 
