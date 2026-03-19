@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>班级宠物园 - 使用说明书</title>
+    <style>
+      :root {
+        --text: #0f172a;
+        --muted: #475569;
+        --border: #e2e8f0;
+        --bg: #ffffff;
+        --chip: #f8fafc;
+        --accent: #f59e0b;
+        --code: #0b1220;
+      }
+      @page {
+        size: A4;
+        margin: 18mm 16mm;
+      }
+      html,
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
+          "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+        line-height: 1.6;
+      }
+      body {
+        max-width: 900px;
+        margin: 24px auto;
+        padding: 0 18px 40px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 6px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 18px;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--chip);
+        color: var(--muted);
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 22px 0 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+      }
+      h3 {
+        font-size: 15px;
+        margin: 16px 0 8px;
+      }
+      p {
+        margin: 8px 0;
+      }
+      ul {
+        margin: 8px 0 8px 20px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+      pre {
+        background: #0b1220;
+        color: #e2e8f0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        overflow: auto;
+        border: 1px solid rgba(226, 232, 240, 0.12);
+      }
+      .note {
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--accent);
+        background: #fffaf0;
+        padding: 10px 12px;
+        border-radius: 12px;
+        color: #7c2d12;
+        margin: 10px 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .toc a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        text-decoration: underline;
+      }
+      .footer {
+        margin-top: 26px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--border);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      @media print {
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>班级宠物园（Class Pet Home）使用说明书
+    <div class="sub">版本：20260319-V1.0 · 适用对象：班主任/任课老师/助教</div>
+
+    <div class="note">
+      作者：卫兵，微信：H1203322195
+    </div>
+
+    <h2 id="toc">目录</h2>
+    <div class="toc muted">
+      <ul>
+        <li><a href="#intro">1. 产品简介</a></li>
+        <li><a href="#quick">2. 快速开始（3 分钟上手）</a></li>
+        <li><a href="#home">3. 主界面说明</a></li>
+        <li><a href="#class">4. 班级与学生管理</a></li>
+        <li><a href="#pet">5. 领养与更换宠物</a></li>
+        <li><a href="#score">6. 加分/扣分评价（规则选择）</a></li>
+        <li><a href="#rules">7. 加减分规则管理</a></li>
+        <li><a href="#shop">8. 小商店（兑换）</a></li>
+        <li><a href="#leaderboard">9. 排行榜</a></li>
+        <li><a href="#records">10. 评价记录（最近 50 条）</a></li>
+        <li><a href="#undo">11. 撤回评价</a></li>
+        <li><a href="#data">12. 数据管理</a></li>
+        <li><a href="#deploy">13. 本地打包与部署（内网/公网）</a></li>
+        <li><a href="#faq">14. 常见问题（FAQ）</a></li>
+      </ul>
+    </div>
+
+    <h2 id="intro">1. 产品简介</h2>
+    <p>
+      「班级宠物园」是一款面向课堂管理的轻量工具：通过 <b>加分/扣分评价</b> 推动学生的正向行为，同时将积分与“宠物成长/徽章/小商店兑换”等机制结合，提升参与度与持续性。
+    </p>
+    <p class="muted">
+      本软件默认无需登录，数据保存在本机浏览器（localStorage）。同时支持手动导入导出、记录导出、以及自动备份到本地文件（浏览器支持时）。
+    </p>
+
+    <h2 id="quick">2. 快速开始（3 分钟上手）</h2>
+    <ol>
+      <li>打开网页后，先确认右上角班级名称（点击可进入 <b>班级与学生管理</b>）。</li>
+      <li>在 <b>班级与学生管理</b> 中：新增班级（可选）、添加学生或批量导入学生名单。</li>
+      <li>回到主界面：未领养的学生卡片显示 🥚，点击卡片或“领养宠物”为学生选择宠物。</li>
+      <li>给学生评价：点击已领养学生卡片 → 选择加分/扣分规则 → 完成一次评价。</li>
+    </ol>
+
+    <h2 id="home">3. 主界面说明</h2>
+    <h3>3.1 顶部功能区</h3>
+    <ul>
+      <li><b>搜索学生</b>：按姓名或学号筛选</li>
+      <li><b>排行榜</b>：查看徽章/等级等排序</li>
+      <li><b>小商店</b>：设置商品与兑换</li>
+      <li><b>评价记录</b>：查看最近 50 条，并支持导出</li>
+      <li><b>撤回评价</b>：撤回最近一次评价</li>
+      <li><b>批量评价</b>：对多名学生同时评价</li>
+      <li><b>设置与帮助</b>：规则管理、成长设置、数据管理等</li>
+    </ul>
+
+    <h3>3.2 学生卡片</h3>
+    <ul>
+      <li>未领养：显示 🥚，点击领养</li>
+      <li>
+        已领养：显示宠物与等级、积分与徽章；<b>点击卡片进入加分/扣分</b>；左上角「⟳」支持更换宠物（更换后会清空积分）
+      </li>
+    </ul>
+
+    <h2 id="class">4. 班级与学生管理</h2>
+    <p>入口：点击顶部班级名或在设置中进入。</p>
+    <h3>4.1 班级列表</h3>
+    <ul>
+      <li>支持新增/编辑/删除班级；当前使用班级标记“当前使用”</li>
+      <li><b>编辑/删除按钮为悬浮显示（hover）</b></li>
+    </ul>
+    <h3>4.2 学生列表</h3>
+    <ul>
+      <li>支持新增学生（姓名必填，学号可选且需为纯数字）</li>
+      <li>支持批量导入：每行一位（姓名 学号），学号可省略</li>
+      <li><b>编辑/删除按钮为悬浮显示（hover）</b></li>
+    </ul>
+
+    <h2 id="pet">5. 领养与更换宠物</h2>
+    <ul>
+      <li>未领养：点击卡片或“领养宠物”</li>
+      <li>已领养：点击卡片左上「⟳」更换</li>
+      <li class="muted">更换宠物会清空该学生积分，以保证激励公平性</li>
+    </ul>
+
+    <h2 id="score">6. 加分/扣分评价（规则选择）</h2>
+    <ol>
+      <li>点击已领养的学生卡片（或批量模式）进入评价</li>
+      <li>选择分类（学习/行为/健康/其他）</li>
+      <li>点击规则卡片，即完成一次加分/扣分</li>
+    </ol>
+
+    <h2 id="rules">7. 加减分规则管理</h2>
+    <p>入口：设置 → 加减分规则。</p>
+    <ul>
+      <li>左侧：分类目录 + 规则统计（加分/减分条数）</li>
+      <li>右侧：规则卡片（图标/名称/分值/范围标签），支持编辑/删除</li>
+      <li>新增指标：图标、名称、分类、范围（全部/本班）、导向（奖励/扣分）、分值</li>
+      <li class="muted">分值颜色：加分绿色、减分红色</li>
+    </ul>
+
+    <h2 id="shop">8. 小商店（兑换）</h2>
+    <ul>
+      <li>商品列表：展示可兑换商品（徽章作为货币）</li>
+      <li>记录：查看兑换记录</li>
+      <li>管理商品：新增/编辑/删除商品（图标、价格、库存、启用等）</li>
+    </ul>
+
+    <h2 id="leaderboard">9. 排行榜</h2>
+    <p class="muted">默认按徽章数、等级、积分等排序（以当前版本界面为准）。</p>
+
+    <h2 id="records">10. 评价记录（最近 50 条）</h2>
+    <ul>
+      <li>查看最近 50 条：学生、规则、分类、时间、分值</li>
+      <li>单条撤回（若该条记录支持）</li>
+      <li><b>导出 Excel</b>：当前导出为 CSV（Excel 可直接打开，且带 BOM 避免中文乱码）</li>
+    </ul>
+
+    <h2 id="undo">11. 撤回评价</h2>
+    <ul>
+      <li>顶部“撤回评价”：撤回最近一条</li>
+      <li>评价记录“撤回”：撤回指定记录</li>
+      <li class="muted">旧版本历史数据可能因缺少“操作前状态”而无法撤回</li>
+    </ul>
+
+    <h2 id="data">12. 数据管理</h2>
+    <h3>12.1 导入/导出（JSON）</h3>
+    <ul>
+      <li>复制导出：复制 JSON 到剪贴板</li>
+      <li>下载导出：下载 JSON 文件</li>
+      <li>导入数据：粘贴 JSON 导入（会覆盖当前数据）</li>
+    </ul>
+    <h3>12.2 自动备份到本地文件（可选）</h3>
+    <ul>
+      <li>需要浏览器支持 File System Access API（如 Chrome/Edge）</li>
+      <li>首次选择备份文件并授权；支持开启/关闭、立即备份、清除目标、设置备份间隔</li>
+      <li class="muted">清除目标仅清除浏览器记住的文件句柄，不会删除磁盘文件</li>
+    </ul>
+
+    <h2 id="faq">13. 常见问题（FAQ）</h2>
+    <h3>Q1：数据会丢吗？</h3>
+    <p>
+      默认在浏览器 localStorage。建议定期“下载导出 JSON”，并在浏览器支持时开启“自动备份到本地文件”。
+    </p>
+    <h3>Q2：为什么目标文件不显示完整路径？</h3>
+    <p class="muted">浏览器出于安全限制，通常无法读取完整路径，只能显示文件名或“已选择/未选择”。</p>
+    <h3>Q3：能做账号登录、线上同步吗？</h3>
+    <p class="muted">敬请期待，有需求可以联系我(微信：H1203322195)。</p>
+
+    <div class="footer">© 班级宠物园 · 使用说明书 · 2026-03-19</div>
+  </body>
+</html>
+
